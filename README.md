@@ -19,7 +19,9 @@ Usage
 To split a long slide, you need to indicate position inside original slide by
 adding following line:
 
-```html <div style="page-break-after:always"></div> ```
+```html
+<div style="page-break-after:always"></div>
+```
 
 Indeed, it could be any tag set with `page-break-after:always` style. Every
 time you add this line, a new slide with the same title will be created, so you
