@@ -1,0 +1,250 @@
+= Real World Enterprise Workflow for Red Hat JBoss Fuse
+Jyrki Ruuskanen, Finavia Corporation, 2014
+:backend: deckjs
+:deckjs_theme: swiss
+:status:
+:customcss: main.css
+:split:
+
+== Apache Camel
+
+http://camel.apache.org
+
+A Java-based routing and mediation library.
+
+[options="step"]
+[plantuml, camel_blocks, svg]
+....
+title Camel building blocks
+object "Camel context" as context
+object "Camel route" as route
+context "1" - "*" route
+....
+
+[options="step"]
+[source="java"]
+.Example camel route
+....
+from("direct:start")
+   .routeId("myRoute")
+   .log("Processed something")
+   .to("file:///output?fileName=out-$simple{date:now:yyyyMMddHHmmssSSS}.txt");
+....
+
+<<<
+
+[plantuml, camel_lifecycle, svg]
+....
+title Camel context lifecycle
+[*] -> Created : context = new [Osgi]DefaultCamelContext()
+Created -> Started : context.start()
+Created -> Stopped : context.stop()
+Started --> Suspended : context.suspend()
+Suspended --> Started : context.resume()
+Suspended --> Stopped : context.stop()
+Started -> Stopped : context.stop()
+Stopped -> [*]
+....
+
+== OSGi
+
+http://osgi.org
+
+"The OSGi technology is a set of specifications that define a dynamic component system for Java."
+-- http://www.osgi.org/Technology/WhatIsOSGi
+
+[options="step"]
+[plantuml, inside_osgi, svg]
+....
+interface "org.apache.camel.spi.ComponentResolver;component=?" as service
+[camel-scr] -- org.apache.camel.scr : export package
+[my-bundle] <.. org.apache.camel.scr : import package
+[camel-?] -- service  : export service
+[my-bundle] <.. service : import service 
+....
+
+<<<
+
+[plantuml, bundle_lifecycle, svg]
+....
+title OSGi bundle lifecycle
+[*] -> Installed
+Installed -> Resolved
+Resolved -> Installed
+Resolved -> Starting : start
+Starting -> Active
+Active -> Stopping : stop
+Stopping -> Resolved
+Resolved --> Uninstalled
+Installed --> Uninstalled
+Uninstalled --> [*]
+....
+
+=== Apache Karaf
+
+http://karaf.apache.org
+
+== OSGi Declarative Services
+
+http://wiki.osgi.org/wiki/Declarative_Services
+
+////
+OSGi Declarative Services allows us to describe a POJO to OSGi with a declaration. The declaration tells OSGi which methods to invoke when and which requirements have to be fulfilled before the component can be activated, and more.
+////
+
+[plantuml, service_component, svg]
+....
+hide empty members
+package "Service Component" {
+	class MyClass {
+		+activate()
+		+deactivate()
+	}
+	class "my.company.MyClass.xml" as xml << (X, lightblue) >>
+}
+....
+
+[options="step"]
+[source="xml"]
+.my.company.MyClass.xml
+....
+<?xml version="1.0" encoding="UTF-8"?><components xmlns:scr="http://www.osgi.org/xmlns/scr/v1.2.0">
+    <scr:component immediate="true" name="my.company.MyClass">
+        <implementation class="my.company.MyClass"/>
+        <property name="camelContextId" value="my-class"/>
+        <property name="camelRouteId" value="foo/timer-log"/>
+        <property name="active" value="true"/>
+        <property name="from" value="timer:foo?period=5000"/>
+        <property name="to" value="log:foo?showHeaders=true"/>
+        <property name="service.pid" value="my.company.MyClass"/>
+        <reference name="camelComponent" interface="org.apache.camel.spi.ComponentResolver" cardinality="1..n" policy="dynamic" bind="gotCamelComponent" unbind="lostCamelComponent" policy-option="greedy"/>
+    </scr:component>
+</components>
+....
+
+<<<
+
+[plantuml, ds_lifecycle, svg]
+....
+title Service Component lifecycle
+[*] -> Unsatisfied
+Unsatisfied -> Satisfied
+Satisfied -> Active
+Satisfied -> Unsatisfied
+Active -> Disabled
+Active -> Unsatisfied
+Disabled -> Active
+Disabled -> [*]
+
+Note bottom of Active
+	OSGi calls activate() when requirements are fulfilled and either:
+	- Service Component is marked immediate
+	- Component is needed by another component
+	- Explicitly
+end note
+
+Note top of Disabled
+	OSGi calls deactivate() either:
+	- When requirements are no longer fulfilled
+	- Explicitly
+end note
+....
+
+=== Apache Felix
+
+http://felix.apache.org/documentation/subprojects/apache-felix-service-component-runtime.html
+
+Apache Felix Service Runtime Component is an implementation of OSGi Declarative Services specification.
+
+== Camel SCR Support
+
+http://camel.apache.org/camel-and-scr.html
+
+[options="step"]
+[plantuml, camel_scr, svg]
+....
+hide empty members
+package org.apache.camel/camel-scr {
+	abstract class AbstractCamelRunner {
+		+activate(final BundleContext bundleContext, final Map<String, String> props) throws Exception
+		+deactivate()
+		+gotCamelComponent(final ComponentResolver componentResolver)
+		+lostCamelComponent()
+	}
+	note bottom
+		Couples Camel context lifecycle to Service Component lifecycle and
+		passes configuration from OSGi with help of Camel's Properties component.
+	end note
+	class ScrHelper
+	note bottom
+		Helper methods for dealing with SCR.
+	end note
+}
+....
+
+[options="step"]
+[plantuml, camel_archetype_scr, svg]
+....
+package org.apache.camel.archetypes {
+	[camel-archetype-scr]
+	note right
+		Can be used to generate Camel SCR bundle projects.
+	end note
+}
+....
+
+== Camel SCR lifecycle
+
+[plantuml, camel_lifecycle2, svg]
+....
+title Camel as a Service Component
+State "Service Component lifecycle" as scr {
+	[*] -> Active
+	State "Not active" as off {
+		state Unsatisfied
+		state Disabled
+	}
+	Active -> off
+	off -left> Active
+	off -> [*]
+}
+
+State "Camel Context lifecycle" as camel {
+	state "Create and configure" as create
+	[*] -> create
+	create -> Start
+	Start -> Shutdown
+	Shutdown -> [*]
+}
+
+Active --> create : activate()
+off --> Shutdown : deactivate()
+....
+
+== Camel SCR configuration
+
+[plantuml, config_flow, svg]
+....
+hide footbox
+title How OSGi passes configuration to Camel
+participant "OSGi Configuration Admin" as osgi
+participant "Service Component" as component
+participant "Camel Context\n(Properties component)" as camel
+osgi -> component : activate(Map<String, String> configuration)
+component -> camel : setInitialProperties(Properties configuration)
+...
+camel <--] : ""from("**//{{from}}//**")""
+camel <--] : ""   .routeId(**//camelRouteId//**)""
+camel <--] : ""   .to("**//{{to}}//**");""
+....
+
+If the configuration changes OSGi will call `deactivate()` and start over.
+
+== Demo
+
+. Generate a project
+. Build the bundle
+. Deploy the bundle
+. Override default configuration in OSGi
+. Demonstrate template usage
+
