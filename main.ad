@@ -42,6 +42,7 @@ start
 |#PaleGreen|Nexus|
 ....
 
+[options="step"]
 To deploy something in Fuse we first have to create a deployable artifact. In our case we create and deploy OSGi bundles.
 
 [options="step"]
@@ -166,22 +167,32 @@ Select a tagged UAT configuration (typically the latest) and let Jenkins push it
 [options="step"]
 Done.
 
-== Moving configuration from one Fuse to another
+== Demo
+
+. Create a bundle project.
+. Publish the bundle.
+. Prepare Fabric profiles.
+. Publish configuration.
+. Promote configuration to production.
+
+== Enabler 1: Moving configuration from one Fuse to another
 
 Fuse keeps its configuration in Git, so we'll use Git to move the configuration.
 
-== Controlling which bundles (and versions) should run where
+To make sure we don't push changes to a non-master Git node Fuse has to be configured to use an external Git repostitory.
 
-We'll leverage parent profile mechanism here.
+== Enabler 2: Limiting the scope of configuration changes
 
-== Managing environment specific parameters
+Although we could update the whole Fuse branch when we are passing changes around, this could create unnecessary work in form of meaningless conflicts (changed profile refresh timestamps, and the like). Instead we attach a subtree to Fuse configuration which will be the only part of the configuration hierarchy we update through our workflow.
+
+== Enabler 3: Controlling which bundles (and versions) should run where
+
+We'll leverage parent profile mechanism here. Every environment has its own top level profile which defines which profiles are assigned where.
+
+On top of that, this approach makes sure we have the assignments in version control.
+
+== Enabler 4: Managing environment specific parameters
 
 We'll put the bundle configuration in properties and use property prefixes to cover the environment specifics.
 
-[options="step"]
-Alright, on with the show.
-
-== Limiting the scope of configuration changes
-
-Although we could update the whole Fuse branch when we are passing changes around, this could create unnecessary work in form of meaningless conflicts (changed profile refresh timestamps, and the like). So, we decided to attach a subtree to Fuse configuration which will be the only part of the hierarchy we update through our workflow.
-
+This way every target environment is configured in the same place which makes it easy to see the big picture.
