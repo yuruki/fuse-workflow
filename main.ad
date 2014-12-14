@@ -3,248 +3,159 @@ Jyrki Ruuskanen, Finavia Corporation, 2014
 :backend: deckjs
 :deckjs_theme: swiss
 :status:
-:customcss: main.css
 :split:
 
-== Apache Camel
+== Where do we start from?
 
-http://camel.apache.org
+* A team of 2-3 developers who also operate the environments (got the Devs and the Ops right there).
+* Red Hat JBoss Fuse license for 16 processor cores.
+* Green light from the bosses to make Fuse our new integration platform.
 
-A Java-based routing and mediation library.
+=== What are we trying to achieve?
 
-[options="step"]
-[plantuml, camel_blocks, svg]
-....
-title Camel building blocks
-object "Camel context" as context
-object "Camel route" as route
-context "1" - "*" route
-....
+* A highly available setup manageable by a small team.
+* Manual steps kept at minimum, while keeping the setup simple.
+* Everything versioned and reversible.
 
 [options="step"]
-[source="java"]
-.Example camel route
-....
-from("direct:start")
-   .routeId("myRoute")
-   .log("Processed something")
-   .to("file:///output?fileName=out-$simple{date:now:yyyyMMddHHmmssSSS}.txt");
-....
+--
 
-<<<
-
-[plantuml, camel_lifecycle, svg]
+[plantuml, profit, svg]
 ....
-title Camel context lifecycle
-[*] -> Created : context = new [Osgi]DefaultCamelContext()
-Created -> Started : context.start()
-Created -> Stopped : context.stop()
-Started --> Suspended : context.suspend()
-Suspended --> Started : context.resume()
-Suspended --> Stopped : context.stop()
-Started -> Stopped : context.stop()
-Stopped -> [*]
+(*) -> "Cool, we've got the tools" as cool
+cool -> "?"
+"?" -> Profit
+Profit -> (*)
 ....
 
-== OSGi
+That's the idea. Let's now go through what we got...
+--
 
-http://osgi.org
+== Step 1: Create a bundle project
 
-"The OSGi technology is a set of specifications that define a dynamic component system for Java."
--- http://www.osgi.org/Technology/WhatIsOSGi
+[plantuml, step1, svg]
+....
+(*) -> "Create a bundle project" as create
+create -> "Work on the project"
+....
+
+To deploy something in Fuse we first have to create a deployable artifact. In our case we deploy OSGi bundles.
 
 [options="step"]
-[plantuml, inside_osgi, svg]
+.Generate a bundle project
 ....
-interface "org.apache.camel.spi.ComponentResolver;component=?" as service
-[camel-scr] -- org.apache.camel.scr : export package
-[my-bundle] <.. org.apache.camel.scr : import package
-[camel-?] -- service  : export service
-[my-bundle] <.. service : import service 
-....
-
-<<<
-
-[plantuml, bundle_lifecycle, svg]
-....
-title OSGi bundle lifecycle
-[*] -> Installed
-Installed -> Resolved
-Resolved -> Installed
-Resolved -> Starting : start
-Starting -> Active
-Active -> Stopping : stop
-Stopping -> Resolved
-Resolved --> Uninstalled
-Installed --> Uninstalled
-Uninstalled --> [*]
-....
-
-=== Apache Karaf
-
-http://karaf.apache.org
-
-== OSGi Declarative Services
-
-http://wiki.osgi.org/wiki/Declarative_Services
-
-////
-OSGi Declarative Services allows us to describe a POJO to OSGi with a declaration. The declaration tells OSGi which methods to invoke when and which requirements have to be fulfilled before the component can be activated, and more.
-////
-
-[plantuml, service_component, svg]
-....
-hide empty members
-package "Service Component" {
-	class MyClass {
-		+activate()
-		+deactivate()
-	}
-	class "my.company.MyClass.xml" as xml << (X, lightblue) >>
-}
+mvn archetype:generate -Dfilter=org.apache.camel.archetypes:camel-archetype-scr
 ....
 
 [options="step"]
-[source="xml"]
-.my.company.MyClass.xml
-....
-<?xml version="1.0" encoding="UTF-8"?><components xmlns:scr="http://www.osgi.org/xmlns/scr/v1.2.0">
-    <scr:component immediate="true" name="my.company.MyClass">
-        <implementation class="my.company.MyClass"/>
-        <property name="camelContextId" value="my-class"/>
-        <property name="camelRouteId" value="foo/timer-log"/>
-        <property name="active" value="true"/>
-        <property name="from" value="timer:foo?period=5000"/>
-        <property name="to" value="log:foo?showHeaders=true"/>
-        <property name="service.pid" value="my.company.MyClass"/>
-        <reference name="camelComponent" interface="org.apache.camel.spi.ComponentResolver" cardinality="1..n" policy="dynamic" bind="gotCamelComponent" unbind="lostCamelComponent" policy-option="greedy"/>
-    </scr:component>
-</components>
-....
-
-<<<
-
-[plantuml, ds_lifecycle, svg]
-....
-title Service Component lifecycle
-[*] -> Unsatisfied
-Unsatisfied -> Satisfied
-Satisfied -> Active
-Satisfied -> Unsatisfied
-Active -> Disabled
-Active -> Unsatisfied
-Disabled -> Active
-Disabled -> [*]
-
-Note bottom of Active
-	OSGi calls activate() when requirements are fulfilled and either:
-	- Service Component is marked immediate
-	- Component is needed by another component
-	- Explicitly
-end note
-
-Note top of Disabled
-	OSGi calls deactivate() either:
-	- When requirements are no longer fulfilled
-	- Explicitly
-end note
-....
-
-=== Apache Felix
-
-http://felix.apache.org/documentation/subprojects/apache-felix-service-component-runtime.html
-
-Apache Felix Service Runtime Component is an implementation of OSGi Declarative Services specification.
-
-== Camel SCR Support
-
-http://camel.apache.org/camel-and-scr.html
+.Work on the project
+--
+* Use your favorite IDE to work on the project.
+* Add unit tests you can be proud of.
+* Keep your source code in Git.
+--
 
 [options="step"]
-[plantuml, camel_scr, svg]
+I think the bundle is ready, now what?
+
+== Step 2: Publish the bundle
+
+[plantuml, step2, svg]
 ....
-hide empty members
-package org.apache.camel/camel-scr {
-	abstract class AbstractCamelRunner {
-		+activate(final BundleContext bundleContext, final Map<String, String> props) throws Exception
-		+deactivate()
-		+gotCamelComponent(final ComponentResolver componentResolver)
-		+lostCamelComponent()
-	}
-	note bottom
-		Couples Camel context lifecycle to Service Component lifecycle and
-		passes configuration from OSGi with help of Camel's Properties component.
-	end note
-	class ScrHelper
-	note bottom
-		Helper methods for dealing with SCR.
-	end note
-}
+(*) -> "Create a bundle project" as create
+create -> "Work on the project" as work
+work -> "Publish the bundle" as publish_bundle
+publish_bundle --> "Bundle available in Nexus"
 ....
+
+.Publish the bundle
+....
+git notifiedpush
+....
+
+A custom Git alias, `notifiedpush`, works like regular `push` but also informs Jenkins CI server that we have pushed changes to central repository. Jenkins builds the bundle and stores the resulting artifact in Nexus.
 
 [options="step"]
-[plantuml, camel_archetype_scr, svg]
+OK, I have the bundle artifact in a central store ready to be deployed. What next?
+
+== Step 3: Prepare Fabric profiles
+
+[plantuml, step3, svg]
 ....
-package org.apache.camel.archetypes {
-	[camel-archetype-scr]
-	note right
-		Can be used to generate Camel SCR bundle projects.
-	end note
-}
-....
-
-== Camel SCR lifecycle
-
-[plantuml, camel_lifecycle2, svg]
-....
-title Camel as a Service Component
-State "Service Component lifecycle" as scr {
-	[*] -> Active
-	State "Not active" as off {
-		state Unsatisfied
-		state Disabled
-	}
-	Active -> off
-	off -left> Active
-	off -> [*]
-}
-
-State "Camel Context lifecycle" as camel {
-	state "Create and configure" as create
-	[*] -> create
-	create -> Start
-	Start -> Shutdown
-	Shutdown -> [*]
-}
-
-Active --> create : activate()
-off --> Shutdown : deactivate()
+(*) -> "Create a bundle project" as create
+create -> "Work on the project" as work
+work -> "Publish the bundle" as publish_bundle
+publish_bundle -> "Prepare Fabric profiles"
+publish_bundle --> "Bundle available in Nexus"
 ....
 
-== Camel SCR configuration
+* Create a Fabric profile for the bundle and define profile dependencies (= parent profiles) using Fuse management tools in your dev environment.
 
-[plantuml, config_flow, svg]
+[options="step"]
+Then we just pass the configuration to other environments, right?
+
+[options="step"]
+.Right... if you can answer these questions:
+--
+* How can we move the configuration from one Fuse to another?
+* How can we control which bundles (and which versions) should run in UAT and which ones in production?
+* How can we manage environment specific parameters? I.e. when our Camel routes should behave a bit differently in UAT than in prod.
+--
+
+== Moving configuration from one Fuse to another
+
+Fuse keeps its configuration in Git, so we'll use Git to move the configuration.
+
+== Controlling which bundles (and versions) should run where
+
+We'll leverage parent profile mechanism here.
+
+== Managing environment specific parameters
+
+We'll put the bundle configuration in properties and use property prefixes to cover the environment specifics.
+
+[options="step"]
+Alright, on with the show.
+
+== Step 4: Publish the configuration
+
+[plantuml, step4, svg]
 ....
-hide footbox
-title How OSGi passes configuration to Camel
-participant "OSGi Configuration Admin" as osgi
-participant "Service Component" as component
-participant "Camel Context\n(Properties component)" as camel
-osgi -> component : activate(Map<String, String> configuration)
-component -> camel : setInitialProperties(Properties configuration)
-...
-camel <--] : ""from("**//{{from}}//**")""
-camel <--] : ""   .routeId(**//camelRouteId//**)""
-camel <--] : ""   .to("**//{{to}}//**");""
+(*) -> "Create a bundle project" as create
+create -> "Work on the project" as work
+work -> "Publish the bundle" as publish_bundle
+publish_bundle -> "Prepare Fabric profiles" as profiles
+publish_bundle --> "Bundle available in Nexus"
+profiles -> "Publish the configuration" as publish_config
+publish_config --> "UAT config updated and tagged"
 ....
 
-If the configuration changes OSGi will call `deactivate()` and start over.
+.Publish the configuration
+....
+git notifiedpush
+....
 
-== Demo
+The configuration changes will now be deployed in User Acceptance Testing environment.
 
-. Generate a project
-. Build the bundle
-. Deploy the bundle
-. Override default configuration in OSGi
-. Demonstrate template usage
+== Step 5: Promoting configuration to production
+
+[plantuml, step5, svg]
+....
+(*) -> "Create a bundle project" as create
+create -> "Work on the project" as work
+work -> "Publish the bundle" as publish_bundle
+publish_bundle -> "Prepare Fabric profiles" as profiles
+publish_bundle --> "Bundle available in Nexus"
+profiles -> "Publish the configuration" as publish_config
+publish_config -> "Promote tagged config\nto production" as promote
+publish_config --> "UAT config updated and tagged"
+promote -> (*)
+promote --> "Production config updated and tagged"
+....
+
+* Select a UAT configuration (typically the latest) and let Jenkins push it to production.
+
+== Limiting the scope of configuration changes
+
+Although we could update the whole Fuse branch when we are passing changes around, this could create unnecessary work in form of meaningless conflicts (changed profile refresh timestamps, and the like). So, we decided to attach a subtree to Fuse configuration which will be the only part of the hierarchy we update through our workflow.
 
