@@ -19,33 +19,33 @@ Jyrki Ruuskanen, Finavia Corporation, 2014
 
 [options="step"]
 --
-
 [plantuml, profit, svg]
 ....
-(*) -> "Cool, we've got the tools" as cool
-cool -> "?"
-"?" -> Profit
-Profit -> (*)
+start
+#PaleTurquoise:Cool, we're good to go;
+:?;
+#PaleGreen:Profit!;
+stop
 ....
 
-That's the idea. Let's now go through what we got...
+That's the idea. Now let's go through what we got...
 --
 
 == Step 1: Create a bundle project
 
-[plantuml, step1, svg]
+[plantuml, step1_workflow, svg]
 ....
-(*) -> "Create a bundle project" as create
-create -> "Work on the project"
+|Developer|
+start
+#PaleTurquoise:Create a bundle project;
+:Work on the project;
+|#PaleGreen|Nexus|
 ....
 
-To deploy something in Fuse we first have to create a deployable artifact. In our case we deploy OSGi bundles.
+To deploy something in Fuse we first have to create a deployable artifact. In our case we create and deploy OSGi bundles.
 
 [options="step"]
-.Generate a bundle project
-....
-mvn archetype:generate -Dfilter=org.apache.camel.archetypes:camel-archetype-scr
-....
+Generate a bundle project with `mvn archetype:generate -Dfilter=org.apache.camel.archetypes:camel-archetype-scr`.
 
 [options="step"]
 .Work on the project
@@ -60,47 +60,111 @@ I think the bundle is ready, now what?
 
 == Step 2: Publish the bundle
 
-[plantuml, step2, svg]
+[plantuml, step2_workflow, svg]
 ....
-(*) -> "Create a bundle project" as create
-create -> "Work on the project" as work
-work -> "Publish the bundle" as publish_bundle
-publish_bundle --> "Bundle available in Nexus"
+|Developer|
+start
+:Create a bundle project;
+:Work on the project;
+#PaleTurquoise:Publish the bundle;
+|Jenkins|
+:Build the bundle and upload to Nexus;
+|#PaleGreen|Nexus|
+:Artifact stored>
+stop
 ....
 
-.Publish the bundle
-....
-git notifiedpush
-....
+[options="step"]
+Publish the bundle with `git notifiedpush`.
 
-A custom Git alias, `notifiedpush`, works like regular `push` but also informs Jenkins CI server that we have pushed changes to central repository. Jenkins builds the bundle and stores the resulting artifact in Nexus.
+[options="step"]
+Custom Git alias, `notifiedpush`, works like regular `push` but also informs Jenkins CI server that we have pushed changes to central repository. Jenkins builds the bundle and stores the resulting artifact in Nexus.
 
 [options="step"]
 OK, I have the bundle artifact in a central store ready to be deployed. What next?
 
 == Step 3: Prepare Fabric profiles
 
-[plantuml, step3, svg]
+[plantuml, step3_workflow, svg]
 ....
-(*) -> "Create a bundle project" as create
-create -> "Work on the project" as work
-work -> "Publish the bundle" as publish_bundle
-publish_bundle -> "Prepare Fabric profiles"
-publish_bundle --> "Bundle available in Nexus"
+|Developer|
+start
+#PaleTurquoise:Prepare Fabric profiles;
+|?|
+:?;
+|UAT|
+:Configuration updated;
+|#PaleGreen|Production|
 ....
 
-* Create a Fabric profile for the bundle and define profile dependencies (= parent profiles) using Fuse management tools in your dev environment.
+[options="step"]
+Use your dev environment to create a Fabric profile for the bundle and define profile dependencies (= parent profiles).
 
 [options="step"]
 Then we just pass the configuration to other environments, right?
 
 [options="step"]
-.Right... if you can answer these questions:
+.Right... but first answer these questions:
 --
-* How can we move the configuration from one Fuse to another?
-* How can we control which bundles (and which versions) should run in UAT and which ones in production?
-* How can we manage environment specific parameters? I.e. when our Camel routes should behave a bit differently in UAT than in prod.
+* How do we move the configuration from one Fuse to another?
+* How do we control which bundles (and which versions) should run in UAT and which ones in production?
+* How do we manage environment specific parameters? I.e. when our Camel routes should behave a bit differently in UAT than in prod.
 --
+
+[options="step"]
+Let's pretend we have the answers and move on.
+
+== Step 4: Publish the configuration
+
+[plantuml, step4_workflow, svg]
+....
+|Developer|
+start
+:Prepare Fabric profiles;
+#PaleTurquoise:Publish the configuration;
+|Jenkins|
+:Update UAT config and tag it;
+|UAT|
+:Configuration updated>
+|#PaleGreen|Production|
+....
+
+[options="step"]
+Publish the configuration with `git notifiedpush`.
+
+[options="step"]
+The configuration changes will now be deployed in User Acceptance Testing environment.
+
+[options="step"]
+When the UAT is accepted you are free to promote the configuration to production.
+
+== Step 5: Promoting configuration to production
+
+[plantuml, step5_workflow, svg]
+....
+|Developer|
+start
+:Prepare Fabric profiles;
+:Publish the configuration;
+|Jenkins|
+:Update UAT config and tag it;
+|UAT|
+:Configuration updated>
+|Developer|
+#PaleTurquoise:Promote tagged config
+to production;
+|Jenkins|
+:Update production config and tag it;
+|#PaleGreen|Production|
+:Configuration updated>
+stop
+....
+
+[options="step"]
+Select a tagged UAT configuration (typically the latest) and let Jenkins push it to production.
+
+[options="step"]
+Done.
 
 == Moving configuration from one Fuse to another
 
@@ -116,44 +180,6 @@ We'll put the bundle configuration in properties and use property prefixes to co
 
 [options="step"]
 Alright, on with the show.
-
-== Step 4: Publish the configuration
-
-[plantuml, step4, svg]
-....
-(*) -> "Create a bundle project" as create
-create -> "Work on the project" as work
-work -> "Publish the bundle" as publish_bundle
-publish_bundle -> "Prepare Fabric profiles" as profiles
-publish_bundle --> "Bundle available in Nexus"
-profiles -> "Publish the configuration" as publish_config
-publish_config --> "UAT config updated and tagged"
-....
-
-.Publish the configuration
-....
-git notifiedpush
-....
-
-The configuration changes will now be deployed in User Acceptance Testing environment.
-
-== Step 5: Promoting configuration to production
-
-[plantuml, step5, svg]
-....
-(*) -> "Create a bundle project" as create
-create -> "Work on the project" as work
-work -> "Publish the bundle" as publish_bundle
-publish_bundle -> "Prepare Fabric profiles" as profiles
-publish_bundle --> "Bundle available in Nexus"
-profiles -> "Publish the configuration" as publish_config
-publish_config -> "Promote tagged config\nto production" as promote
-publish_config --> "UAT config updated and tagged"
-promote -> (*)
-promote --> "Production config updated and tagged"
-....
-
-* Select a UAT configuration (typically the latest) and let Jenkins push it to production.
 
 == Limiting the scope of configuration changes
 
