@@ -9,7 +9,7 @@ Jyrki Ruuskanen, Finavia Corporation, 2014
 
 * A team of 2-3 developers who also operate the environments (got the Devs and the Ops right there).
 * Red Hat JBoss Fuse license for 16 processor cores.
-* Green light from the bosses to make Fuse our new integration platform.
+* Green light from the bosses to make Fuse our next integration platform.
 
 === What are we trying to achieve?
 
@@ -107,7 +107,7 @@ Then we just pass the configuration to other environments, right?
 [options="step"]
 .Right... but first answer these questions:
 --
-* How do we move the configuration from one Fuse to another?
+* How do we move the configuration from one Fuse environment to another?
 * How do we control which bundles (and which versions) should run in UAT and which ones in production?
 * How do we manage environment specific parameters? I.e. when our Camel routes should behave a bit differently in UAT than in prod.
 --
@@ -177,19 +177,75 @@ Done.
 
 == Enabler 1: Moving configuration from one Fuse to another
 
-Fuse keeps its configuration in Git, so we'll use Git to move the configuration.
+[plantuml, fuse_git, svg]
+....
+package "Fabric (My dev environment)" {
+	node "Desktop" {
+		interface "Git" as git1
+		interface "HTTP\n(Git servlet)" as http
+		git1 - [root]
+		http -- [root]
+		http - git1
+		interface "Git" as git2
+		git2 - [broker]
+		interface "Git" as git3
+		git3 - [camel]
+	}
+}
+package "Fabric (UAT or production)" {
+	node "Host1" {
+		interface "Git\n(master)" as git11
+		interface "HTTP\n(Git servlet)" as http1
+		git11 - [root1]
+		http1 -- [root1]
+		http1 - git11
+		interface "Git" as git12
+		git12 - [broker1]
+		interface "Git" as git13
+		git13 - [camel1]
+	}
+	node "Host 2" {
+		interface "Git" as git21
+		interface "HTTP\n(Git servlet)" as http2
+		git21 - [root2]
+		http2 -- [root2]
+		http2 - git11
+		interface "Git" as git22
+		git22 - [broker2]
+		interface "Git" as git23
+		git23 - [camel2]
+	}
+	node "Host n" {
+		interface "Git" as git31
+		interface "HTTP\n(Git servlet)" as http3
+		git31 - [root3]
+		http3 -- [root3]
+		http3 - git11
+		interface "Git" as git32
+		git32 - [broker3]
+		interface "Git" as git33
+		git33 - [camel3]
+	}
+}
+....
 
-To make sure we don't push changes to a non-master Git node Fuse has to be configured to use an external Git repostitory.
+Fuse Fabric comes with a distributed Git setup and keeps its configuration there. We'll use Git tools to move the configuration.
+
+The fact that any Karaf container in Fabric may take the role of Git master makes it a moving target for push operations. Pushing to slaves is not encouraged.
+
+To make sure we don't push changes to a non-master Git node Fuse has to be configured to use an external Git repository. This takes the timing concerns out of the equation as Fuse can update its configuration in its own pace.
 
 == Enabler 2: Limiting the scope of configuration changes
 
 Although we could update the whole Fuse branch when we are passing changes around, this could create unnecessary work in form of meaningless conflicts (changed profile refresh timestamps, and the like). Instead we attach a subtree to Fuse configuration which will be the only part of the configuration hierarchy we update through our workflow.
 
+Only changes in the subtree will be moved the central repository.
+
 == Enabler 3: Controlling which bundles (and versions) should run where
 
-We'll leverage parent profile mechanism here. Every environment has its own top level profile which defines which profiles are assigned where.
+This can be achieved with the parent profile mechanism. Every environment has its own top level profile which defines other profiles as parents. The top level profile is the only profile on the container.
 
-On top of that, this approach makes sure we have the assignments in version control.
+This approach allows us to take profile assignments into version control.
 
 == Enabler 4: Managing environment specific parameters
 
