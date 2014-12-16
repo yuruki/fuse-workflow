@@ -237,23 +237,9 @@ You could, BUT...
 
 <<<
 
-[plantuml, temppi, svg]
+[plantuml, fabric_minimum, svg]
 ....
-package "Fabric (My dev environment)" {
-	node "Desktop" {
-		component "root\ncontainer" as root
-		component "child\ncontainer" as child
-		http -- [root]
-		[root] -- [child]
-		interface "Git\n(master)" as git1
-		interface "HTTP\n(Git servlet)" as http
-		git1 - [root]
-		interface "Git" as git2
-		git2 - [child]
-		git2 ..> git1 : listen
-	}
-}
-package "Fabric (UAT or production)" {
+package "Fabric cluster (3 nodes minimum)" {
 	node "Host 3" {
 		component "root\ncontainer" as root3
 		component "child\ncontainer" as child3
@@ -276,35 +262,76 @@ package "Fabric (UAT or production)" {
 		interface "Git" as git22
 		git22 - [child2]
 	}
-	node "Host1" {
+	node "Host 1" {
 		component "root\ncontainer" as root1
 		component "child\ncontainer" as child1
 		http1 -- [root1]
 		[root1] -- [child1]
-		interface "Git\n(master)" as git11
+		interface "Git" as git11
 		interface "HTTP\n(Git servlet)" as http1
 		git11 - [root1]
 		interface "Git" as git12
 		git12 - [child1]
 	}
 }
-
-component "Git tools" as gittools
-gittools ..> http : pull
-gittools ..> http1 : push
-http1 ..> git11 : update
-git12 ..> git11 : listen
-git21 ..> git11 : listen
-git22 ..> git11 : listen
-git31 ..> git11 : listen
-git32 ..> git11 : listen
 ....
 
-Fuse Fabric comes with a distributed Git setup and keeps its configuration there. We'll use Git tools to move the configuration.
+[options="step"]
+* Any container can be the Git master, and the master can change _at any time_.
+* Push operation should be targeted to the host that has the Git master.
+* Git servlet updates the Git of the root container on the same host, _not the actual master_.
+* You can't force the Git master, short of shutting down every container in Fabric except one.
 
-The fact that any Karaf container in Fabric may take the role of Git master makes it a moving target for push operations. Pushing to slaves is not encouraged.
+<<<
 
-To make sure we don't push changes to a non-master Git node Fuse has to be configured to use an external Git repository. This takes the timing concerns out of the equation as Fuse can update its configuration in its own pace.
+[plantuml, external_git, svg]
+....
+node "Auxiliary Server" {
+	component "Git\nmaster" as master
+}
+package "Fabric cluster" {
+	node "Host 3" {
+		component "root\ncontainer" as root3
+		component "child\ncontainer" as child3
+		[root3] -- [child3]
+		interface "Git\nslave" as git31
+		git31 - [root3]
+		git31 ..> master : follows
+		interface "Git\nslave" as git32
+		git32 - [child3]
+		git32 ..> master : follows
+	}
+	node "Host 2" {
+		component "root\ncontainer" as root2
+		component "child\ncontainer" as child2
+		[root2] -- [child2]
+		interface "Git\nslave" as git21
+		git21 - [root2]
+		git21 ..> master : follows
+		interface "Git\nslave" as git22
+		git22 - [child2]
+		git22 ..> master : follows
+	}
+	node "Host 1" {
+		component "root\ncontainer" as root1
+		component "child\ncontainer" as child1
+		[root1] -- [child1]
+		interface "Git\nslave" as git11
+		git11 - [root1]
+		git11 ..> master : follows
+		interface "Git\nslave" as git12
+		git12 - [child1]
+		git12 ..> master : follows
+	}
+}
+....
+
+[options="step"]
+* Set up a Git repository outside Fuse.
+* Tell Fuse to use the external repository as Git master.
+
+[options="step"]
+Now everything works as it should!
 
 == Enabler 2: Limiting the scope of configuration changes
 
