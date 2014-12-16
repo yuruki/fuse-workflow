@@ -181,52 +181,63 @@ Done.
 ....
 package "Fabric (My dev environment)" {
 	node "Desktop" {
-		interface "Git" as git1
+		component "root\ncontainer" as root
+		component "child\ncontainer" as child
+		http -- [root]
+		[root] -- [child]
+		interface "Git\n(master)" as git1
 		interface "HTTP\n(Git servlet)" as http
 		git1 - [root]
-		http -- [root]
-		http - git1
 		interface "Git" as git2
-		git2 - [broker]
-		interface "Git" as git3
-		git3 - [camel]
+		git2 - [child]
+		git2 ..> git1 : listen
 	}
 }
 package "Fabric (UAT or production)" {
-	node "Host1" {
-		interface "Git\n(master)" as git11
-		interface "HTTP\n(Git servlet)" as http1
-		git11 - [root1]
-		http1 -- [root1]
-		http1 - git11
-		interface "Git" as git12
-		git12 - [broker1]
-		interface "Git" as git13
-		git13 - [camel1]
-	}
-	node "Host 2" {
-		interface "Git" as git21
-		interface "HTTP\n(Git servlet)" as http2
-		git21 - [root2]
-		http2 -- [root2]
-		http2 - git11
-		interface "Git" as git22
-		git22 - [broker2]
-		interface "Git" as git23
-		git23 - [camel2]
-	}
-	node "Host n" {
+	node "Host 3" {
+		component "root\ncontainer" as root3
+		component "child\ncontainer" as child3
+		http3 -- [root3]
+		[root3] -- [child3]
 		interface "Git" as git31
 		interface "HTTP\n(Git servlet)" as http3
 		git31 - [root3]
-		http3 -- [root3]
-		http3 - git11
 		interface "Git" as git32
-		git32 - [broker3]
-		interface "Git" as git33
-		git33 - [camel3]
+		git32 - [child3]
+	}
+	node "Host 2" {
+		component "root\ncontainer" as root2
+		component "child\ncontainer" as child2
+		http2 -- [root2]
+		[root2] -- [child2]
+		interface "Git" as git21
+		interface "HTTP\n(Git servlet)" as http2
+		git21 - [root2]
+		interface "Git" as git22
+		git22 - [child2]
+	}
+	node "Host1" {
+		component "root\ncontainer" as root1
+		component "child\ncontainer" as child1
+		http1 -- [root1]
+		[root1] -- [child1]
+		interface "Git\n(master)" as git11
+		interface "HTTP\n(Git servlet)" as http1
+		git11 - [root1]
+		interface "Git" as git12
+		git12 - [child1]
 	}
 }
+
+component "Git tools" as gittools
+gittools ..> http : pull
+gittools ..> http1 : push
+http1 ..> git11 : update
+git12 ..> git11 : listen
+git21 ..> git11 : listen
+git22 ..> git11 : listen
+git31 ..> git11 : listen
+git32 ..> git11 : listen
 ....
 
 Fuse Fabric comes with a distributed Git setup and keeps its configuration there. We'll use Git tools to move the configuration.
