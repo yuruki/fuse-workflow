@@ -179,6 +179,66 @@ Done.
 
 [plantuml, fuse_git, svg]
 ....
+title Fuse's distributed Git server
+package "Fuse Fabric" {
+		component "root\ncontainer" as root
+		component "child\ncontainer" as child
+		component "another child\ncontainer" as child2
+		http -- [root]
+		interface "Git\nmaster" as master
+		interface "HTTP\n(Git servlet)" as http
+		[root] - master
+		http ..> master : uses
+		interface "Git\nslave" as git2
+		[child] -- git2
+		git2 ..> master : follows
+		interface "Git\nslave" as git3
+		[child2] -- git3
+		git3 ..> master : follows
+}
+....
+
+[options="step"]
+* Fabric keeps its profiles in a Git repository
+* This repository is exposed at `http://<server>:8181/git/fabric`
+
+<<<
+
+[plantuml, fuse_git2, svg]
+....
+package "Fuse Fabric" {
+		component "root\ncontainer" as root
+		component "child\ncontainer" as child
+		component "another child\ncontainer" as child2
+		http -- [root]
+		interface "Git\nmaster" as master
+		interface "HTTP\n(Git servlet)" as http
+		[root] - master
+		http ..> master : uses
+		interface "Git\nslave" as git2
+		[child] -- git2
+		git2 ..> master : follows
+		interface "Git\nslave" as git3
+		[child2] -- git3
+		git3 ..> master : follows
+}
+[Git client] ..> http : push and pull
+note right of [Git client]
+	You can use Fuse's fabric repository
+	just like any other Git repository.
+end note
+....
+
+[options="step"]
+So, we'll just apply our changes to the tracking branch and push the changes to Fabric?
+
+[options="step"]
+You could, BUT...
+
+<<<
+
+[plantuml, temppi, svg]
+....
 package "Fabric (My dev environment)" {
 	node "Desktop" {
 		component "root\ncontainer" as root
