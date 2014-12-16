@@ -200,7 +200,7 @@ package "Fuse Fabric" {
 
 [options="step"]
 * Fabric keeps its profiles in a Git repository
-* This repository is exposed at `http://<server>:8181/git/fabric`
+* This repository is exposed at `http://server:8181/git/fabric`
 
 <<<
 
@@ -222,7 +222,7 @@ package "Fuse Fabric" {
 		[child2] -- git3
 		git3 ..> master : follows
 }
-[Git client] ..> http : push and pull
+[Git client] ..> http : fetch & push
 note right of [Git client]
 	You can use Fuse's fabric repository
 	just like any other Git repository.
@@ -280,7 +280,7 @@ package "Fabric cluster (3 nodes minimum)" {
 * Any container can be the Git master, and the master can change _at any time_.
 * Push operation should be targeted to the host that has the Git master.
 * Git servlet updates the Git of the root container on the same host, _not the actual master_.
-* You can't force the Git master, short of shutting down every container in Fabric except one.
+* You can't force the Git master, short of shutting down every container in Fabric but one.
 
 <<<
 
@@ -335,9 +335,64 @@ Now everything works as it should!
 
 == Enabler 2: Limiting the scope of configuration changes
 
-Although we could update the whole Fuse branch when we are passing changes around, this could create unnecessary work in form of meaningless conflicts (changed profile refresh timestamps, and the like). Instead we attach a subtree to Fuse configuration which will be the only part of the configuration hierarchy we update through our workflow.
+[plantuml, git_flow, svg]
+....
+package "Dev Fabric" {
+	node "Workstation" {
+		component "Git" as git
+	}
+}
+node "Auxiliary Server" {
+	component "Git" as gitmaster
+}
+package "Target Fabric" {
+	node "Host1" {
+		component "Git" as git1
+	}
+	node "Host2" {
+		component "Git" as git2
+	}
+	node "Host3" {
+		component "Git" as git3
+	}
+}
+git ..> gitmaster : updates
+gitmaster ..> git1 : updates
+gitmaster ..> git2 : updates
+gitmaster ..> git3 : updates
+....
 
-Only changes in the subtree will be moved the central repository.
+As we move the configuration around we make a distinction between:
+
+* _/fabric/profiles/mycompany/_ subtree which has our profiles (*company subtree*), and
+* _the rest_ which can be thought of as configuration of Fuse itself (*system profiles*).
+
+<<<
+
+[plantuml, limiting, svg]
+....
+object Configuration
+Configuration *-- "Company subtree"
+Configuration *-- "System profiles"
+....
+
+[options="step"]
+Company subtree is attached to Fabric configuration as a Git subtree with:
+
+[options="step"]
+* `git subtree add --prefix=/fabric/profiles/mycompany mycompany`.
+
+[options="step"]
+Company subtree is overwritten in Fabric configuration with:
+
+[options="step"]
+* `git merge -ours --squash mycompany`
+* `git rm -r -q --ignore-unmatch /fabric/profiles/mycompany`
+* `git read-tree -u mycompany`
+* `git commit -m "Update from mycompany"`
+
+[options="step"]
+With these tools we can automate the updates for company subtree part and be sure that system profiles are not touched.
 
 == Enabler 3: Controlling which bundles (and versions) should run where
 
