@@ -188,13 +188,13 @@ package "Fuse Fabric" {
 		interface "Git\nmaster" as master
 		interface "HTTP\n(Git servlet)" as http
 		[root] - master
-		http ..> master : uses
+		http ..> master : use
 		interface "Git\nslave" as git2
 		[child] -- git2
-		git2 ..> master : follows
+		git2 ..> master : follow
 		interface "Git\nslave" as git3
 		[child2] -- git3
-		git3 ..> master : follows
+		git3 ..> master : follow
 }
 ....
 
@@ -214,13 +214,13 @@ package "Fuse Fabric" {
 		interface "Git\nmaster" as master
 		interface "HTTP\n(Git servlet)" as http
 		[root] - master
-		http ..> master : uses
+		http ..> master : use
 		interface "Git\nslave" as git2
 		[child] -- git2
-		git2 ..> master : follows
+		git2 ..> master : follow
 		interface "Git\nslave" as git3
 		[child2] -- git3
-		git3 ..> master : follows
+		git3 ..> master : follow
 }
 [Git client] ..> http : fetch & push
 note right of [Git client]
@@ -296,10 +296,10 @@ package "Fabric cluster" {
 		[root3] -- [child3]
 		interface "Git\nslave" as git31
 		git31 - [root3]
-		git31 ..> master : follows
+		git31 ..> master : follow
 		interface "Git\nslave" as git32
 		git32 - [child3]
-		git32 ..> master : follows
+		git32 ..> master : follow
 	}
 	node "Host 2" {
 		component "root\ncontainer" as root2
@@ -307,10 +307,10 @@ package "Fabric cluster" {
 		[root2] -- [child2]
 		interface "Git\nslave" as git21
 		git21 - [root2]
-		git21 ..> master : follows
+		git21 ..> master : follow
 		interface "Git\nslave" as git22
 		git22 - [child2]
-		git22 ..> master : follows
+		git22 ..> master : follow
 	}
 	node "Host 1" {
 		component "root\ncontainer" as root1
@@ -318,10 +318,10 @@ package "Fabric cluster" {
 		[root1] -- [child1]
 		interface "Git\nslave" as git11
 		git11 - [root1]
-		git11 ..> master : follows
+		git11 ..> master : follow
 		interface "Git\nslave" as git12
 		git12 - [child1]
-		git12 ..> master : follows
+		git12 ..> master : follow
 	}
 }
 ....
@@ -362,10 +362,13 @@ gitmaster ..> git2 : updates
 gitmaster ..> git3 : updates
 ....
 
+[options="step"]
+--
 As we move the configuration around we make a distinction between:
 
-* _/fabric/profiles/mycompany/_ subtree which has our profiles (*company subtree*), and
-* _the rest_ which can be thought of as configuration of Fuse itself (*system profiles*).
+* _/fabric/profiles/mycompany/_ subtree which has our profiles (let's call it *company subtree*), and
+* _the rest_ which can be thought of as configuration of Fuse itself (let's call them *system profiles*).
+--
 
 <<<
 
@@ -377,31 +380,156 @@ Configuration *-- "System profiles"
 ....
 
 [options="step"]
+--
 Company subtree is attached to Fabric configuration as a Git subtree with:
 
-[options="step"]
 * `git subtree add --prefix=/fabric/profiles/mycompany mycompany`.
+--
 
 [options="step"]
+--
 Company subtree is overwritten in Fabric configuration with:
 
-[options="step"]
 * `git merge -ours --squash mycompany`
 * `git rm -r -q --ignore-unmatch /fabric/profiles/mycompany`
 * `git read-tree -u mycompany`
 * `git commit -m "Update from mycompany"`
+--
 
 [options="step"]
 With these tools we can automate the updates for company subtree part and be sure that system profiles are not touched.
 
 == Enabler 3: Controlling which bundles (and versions) should run where
 
-This can be achieved with the parent profile mechanism. Every environment has its own top level profile which defines other profiles as parents. The top level profile is the only profile on the container.
+[plantuml, versions, svg]
+....
+package "Dev Fabric" {
+	component "my-bundle/1.1-SNAPSHOT" as dev1 <<Next version>>
+	component "other-bundle/1.0-SNAPSHOT" as dev2 <<In UAT>>
+}
+package "Test Fabric" {
+	component "my-bundle/1.0.2" as test1 <<Released>>
+	component "other-bundle/1.0-SNAPSHOT" as test2 <<In UAT>>
+}
+package "Production Fabric" {
+	component "my-bundle/1.0.2" as prod1 <<Released>>
+}
+skinparam component {
+	backgroundColor<<Next version>> Tomato
+	backgroundColor<<In UAT>> Orange
+	backgroundColor<<Released>> PaleGreen
+}
+....
 
-This approach allows us to take profile assignments into version control.
+[options="step"]
+*Different environments* are running *different bundles* and *different versions of bundles*.
 
-== Enabler 4: Managing environment specific parameters
+[options="step"]
+But at the same time they use the *same company subtree*. How did we arrange that?
 
-We'll put the bundle configuration in properties and use property prefixes to cover the environment specifics.
+<<<
 
-This way every target environment is configured in the same place which makes it easy to see the big picture.
+We'll define one top-level profile for each environment:
+
+* `mycompany-dev-worker`
+* `mycompany-test-worker`
+* `mycompany-prod-worker`
+
+[options="step"]
+--
+Our worker containers then have one of the above profiles assigned to them:
+
+[plantuml, top_level, svg]
+....
+package "Dev Fabric" {
+	node "Container" as devworker {
+		component "mycompany-dev-worker" as dev
+	}
+}
+package "Test Fabric" {
+	node "Container" as testworker {
+		component "mycompany-test-worker" as test
+	}
+}
+package "Production Fabric" {
+	node "Container" as prodworker {
+		component "mycompany-prod-worker" as prod
+	}
+}
+....
+--
+
+[options="step"]
+Now, instead of assigning our other profiles directly to the containers, we assign them to the top-level profile as parents.
+
+<<<
+
+Top-level profiles:
+
+* Bring bundle profile assignments into version control.
+* Allow us to control what to run per environment.
+* Allow us to use the same configuration across different systems.
+
+== Enabler 4: Environment specific parameters for Camel
+
+[plantuml, example_integration, svg]
+....
+title One profile, four behaviors
+package "Dev Fabric" {
+	node "Container" as devworker {
+		component "mycompany-bundle-camel-test-1.0" as dev
+	}
+}
+package "Test Fabric" {
+	node "Container" as testworker {
+		component "mycompany-bundle-camel-test-1.0" as test
+	}
+}
+package "Production Fabric" {
+	node "Container" as prodworker {
+		component "mycompany-bundle-camel-test-1.0" as prod
+	}
+}
+package "Unit test" {
+	component "mycompany-bundle-camel-test-1.0" as unit
+}
+dev ..> [My dev source] : read
+dev ..> [My dev target] : write
+test ..> [Test source] : read
+test ..> [Test target] : read
+prod ..> [Source] : read
+prod ..> [Target] : write
+unit ..> [Mock source] : read
+unit ..> [Mock target] : write
+....
+
+Often Camel routes should behave differently depending on whether they run in UAT or in production.
+
+<<<
+
+Our solution:
+
+[options="step"]
+[source,java]
+.Use properties to define key route parameters
+....
+from("{{from}}")
+   .routeId(camelRouteId)
+   .log("Processed something")
+   .to("{{to}}");
+....
+
+[options="step"]
+.Set property prefix per environment in top-level profile
+....
+fabric:profile-edit --system camel.scr.properties.prefix=test mycompany-test-worker
+....
+
+[options="step"]
+.Override default properties with prefixes when necessary
+....
+from = My dev source
+test.from = Test source
+prod.from = Source
+unit.from = Mock source
+....
