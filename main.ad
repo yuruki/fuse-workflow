@@ -107,9 +107,10 @@ Then we just pass the configuration to other environments, right?
 [options="step"]
 .Right... but first answer these questions:
 --
-* How do we move the configuration from one Fuse environment to another?
+* How do we move configuration from one Fuse environment to another?
+* Can we move only part of the configuration?
 * How do we control which bundles (and which versions) should run in UAT and which ones in production?
-* How do we manage environment specific parameters? I.e. when our Camel routes should behave a bit differently in UAT than in prod.
+* How can we use environment specific parameters? I.e. when our Camel routes should behave a bit differently in UAT than in prod.
 --
 
 [options="step"]
@@ -175,7 +176,7 @@ Done.
 . Publish configuration.
 . Promote configuration to production.
 
-== Enabler 1: Moving configuration from one Fuse to another
+== Enabler 1: How do we move configuration from one Fuse environment to another?
 
 [plantuml, fuse_git, svg]
 ....
@@ -333,7 +334,7 @@ package "Fabric cluster" {
 [options="step"]
 Now everything works as it should!
 
-== Enabler 2: Limiting the scope of configuration changes
+== Enabler 2: Can we move only part of the configuration?
 
 [plantuml, git_flow, svg]
 ....
@@ -399,7 +400,7 @@ Company subtree is overwritten in Fabric configuration with:
 [options="step"]
 With these tools we can automate the updates for company subtree part and be sure that system profiles are not touched.
 
-== Enabler 3: Controlling which bundles (and versions) should run where
+== Enabler 3: How do we control which bundles (and which versions) should run where?
 
 [plantuml, versions, svg]
 ....
@@ -470,7 +471,7 @@ Top-level profiles:
 * Allow us to control what to run per environment.
 * Allow us to use the same configuration across different systems.
 
-== Enabler 4: Environment specific parameters for Camel
+== Enabler 4: How can we use environment specific parameters?
 
 [plantuml, example_integration, svg]
 ....
